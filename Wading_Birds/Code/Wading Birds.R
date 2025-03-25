@@ -11,7 +11,7 @@ library(maps)
 library(elevatr) 
 library(terra)    
 
-birds <- read.csv("Master_LakeO_Foraging_UF.csv")
+birds <- read.csv("Data/Master_LakeO_Foraging_UF.csv")
 
 birds[is.na(birds)] <- 0 ### Fill all NAs with 0's so now we have absence data.
 birds <- birds %>% filter(Y != 0) ### Filter lat and long for any points that are 0s (Around 5 were)
@@ -49,9 +49,9 @@ ggplot(birds_filtered, aes(x = Long, y = Lat)) +
        y = "Latitude")
 
 
-# Function to create a bird count heatmap using birds_filtered dataframe (to ensure all points within Lake O)
+# Function to create a bird count heatmap and save it to the "Heat Maps" folder
 create_bird_heatmap <- function(selected_year = NULL) {
-
+  
   df <- birds_filtered
   
   # Filter by year if specified
@@ -66,22 +66,34 @@ create_bird_heatmap <- function(selected_year = NULL) {
     cat("No data available for the specified year:", selected_year, "\n")
     return(NULL)
   }
+  
+  # Create the directory if it doesn't exist
+  output_dir <- "Heat Maps"
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir)
+  }
+  
   # Round coordinates to create grid cells
   filtered_df <- filtered_df %>%
     mutate(
       Lat_rounded = round(Lat, 1),
       Long_rounded = round(Long, 1)
     )
+  
   # Aggregate bird counts by rounded coordinates
   agg_df <- filtered_df %>%
     group_by(Lat_rounded, Long_rounded) %>%
     summarize(Total_Birds = sum(All.Bird.Total), .groups = "drop")
-  # Create title based on year selection
+  
+  # Create title and filename based on year selection
   if (!is.null(selected_year)) {
     plot_title <- paste("Bird Count Heatmap (", selected_year, ")", sep = "")
+    file_name <- paste0(output_dir, "/Bird_Heatmap_", selected_year, ".png")
   } else {
     plot_title <- "Bird Count Heatmap (All Years)"
+    file_name <- paste0(output_dir, "/Bird_Heatmap_All_Years.png")
   }
+  
   # Create the heatmap using ggplot2
   p <- ggplot(agg_df, aes(x = Long_rounded, y = Lat_rounded, fill = Total_Birds)) +
     geom_tile(color = "white", linewidth = 0.1) +
@@ -104,22 +116,32 @@ create_bird_heatmap <- function(selected_year = NULL) {
     ) +
     coord_fixed()
   
+  # Save the heatmap to the folder
+  ggsave(file_name, plot = p, width = 8, height = 6, dpi = 300)
+  
   return(p)
 }
 
-# Create heatmap for all years
+# Create and save heatmap for all years
 bird_heatmap_all <- create_bird_heatmap()
 print(bird_heatmap_all)
 
-# Creat a yearly heatmap
+
+
+# Function to create yearly heatmaps and save them in "Heat Maps"
 create_yearly_heatmaps <- function() {
+  output_dir <- "Heat Maps"
+  if (!dir.exists(output_dir)) {
+    dir.create(output_dir)
+  }
+  
   years <- unique(birds_filtered$Year)
   
   for (year in years) {
     cat("Creating heatmap for year:", year, "\n")
     p <- create_bird_heatmap(selected_year = year)
     if (!is.null(p)) {
-      ggsave(paste0("bird_heatmap_", year, ".png"), plot = p, width = 10, height = 8)
+      ggsave(paste0(output_dir, "/Bird_Heatmap_", year, ".png"), plot = p, width = 10, height = 8, dpi = 300)
     }
   }
   
@@ -127,12 +149,10 @@ create_yearly_heatmaps <- function() {
   cat("Creating combined heatmap for all years\n")
   p_all <- create_bird_heatmap()
   if (!is.null(p_all)) {
-    ggsave("bird_heatmap_all_years.png", plot = p_all, width = 10, height = 8)
+    ggsave(paste0(output_dir, "/Bird_Heatmap_All_Years.png"), plot = p_all, width = 10, height = 8, dpi = 300)
   }
 }
 
+# Generate yearly heatmaps
 birds_heatmap_yearly <- create_yearly_heatmaps()
 print(birds_heatmap_yearly)
-
-
-
